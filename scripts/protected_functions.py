@@ -78,7 +78,7 @@ def calc_martingale(p_pred, y_test, n_test, k, plot_charts=False):
                 # at this point I know that Bern(ppp,y_test[n])!=0
                 # MartCap[k] *= Bern(new_ppp,y_test[n]) / Bern(ppp,y_test[n])
                 # for i in range(K):
-                mart_cap[k] *= np.exp(-brier_loss(y_test[n], new_ppp, k)) / np.exp(-brier_loss(y_test[n], pp[n], k))
+                mart_cap[cal_id] *= np.exp(-brier_loss(y_test[n], new_ppp, k)) / np.exp(-brier_loss(y_test[n], pp[n], k))
             increase = np.sum(mart_cap[:])  # relative increase in my capital
             log_sj_martingale[j_index, n + 1] = log_sj_martingale[j_index, n] + np.log10(increase)
             mart_cap[:] /= increase
@@ -146,7 +146,7 @@ def calibrate_probs(p_pred, y_test, n_test, k):
             for cal_id in range(n_cal):
                 cal_pp_k = my_cal(pp[n], cal_id, k)  # prediction calibrated by the k-th calibrator
                 for j_index in range(n_jumpers):
-                    g[i] += a_weight[j_index, k] * np.exp(-brier_loss(i, cal_pp_k, k))  # accumulating predictions calibrated by the calibrators
+                    g[i] += a_weight[j_index, cal_id] * np.exp(-brier_loss(i, cal_pp_k, k))  # accumulating predictions calibrated by the calibrators
             g[i] = -np.log(g[i])
         # We need to solve equation for s, let's first try a shortcut:
         s = (2 + np.sum(g)) / k
@@ -159,7 +159,7 @@ def calibrate_probs(p_pred, y_test, n_test, k):
         for cal_id in range(n_cal):
             cal_pp_k = my_cal(pp[n], cal_id, k)  # base prediction calibrated by the k-th calibrator
             for j_index in range(n_jumpers):
-                a_weight[j_index, k] *= np.exp(-brier_loss(y_test[n], cal_pp_k, k))  # updating the active capital
+                a_weight[j_index, cal_id] *= np.exp(-brier_loss(y_test[n], cal_pp_k, k))  # updating the active capital
         # Normalizing at each step (not needed):
         capital = p_weight + np.sum(a_weight[:, :])  # the overall weight
         p_weight /= capital  # normalization of the passive weight

@@ -26,21 +26,23 @@ def run_digits(selected_digits, k):
     x_test_dist = idx2numpy.convert_from_file(DATA_DIR + 't10k-images-idx3-ubyte')
     y_test_dist = idx2numpy.convert_from_file(DATA_DIR + 't10k-labels-idx1-ubyte')
 
-    train_ind = np.concatenate((np.where(y_train_dist == selected_digits[0])[0],
-                                np.random.choice(np.where(y_train_dist == selected_digits[1])[0],
-                                                 int(len(y_train_dist[y_train_dist == selected_digits[1]])))))
+    # train_ind = np.concatenate((np.where(y_train_dist == selected_digits[0])[0],
+    #                             np.random.choice(np.where(y_train_dist == selected_digits[1])[0],
+    #                                              int(len(y_train_dist[y_train_dist == selected_digits[1]])))))
     test_ind = np.concatenate((np.where(y_test_dist == selected_digits[0])[0],
                                np.random.choice(np.where(y_test_dist == selected_digits[1])[0],
                                                 int(len(y_test_dist[y_test_dist == selected_digits[1]])))))
-
-    x_train_dist = x_train_dist[train_ind]
-    y_train_dist = y_train_dist[train_ind]
-
+    #
+    # x_train_dist = x_train_dist[train_ind]
+    # y_train_dist = y_train_dist[train_ind]
+    #
     x_test_dist = x_test_dist[test_ind]
     y_test_dist = y_test_dist[test_ind]
 
-    x_train_dist = tf.pad(x_train_dist, [[0, 0], [2, 2], [2, 2]]) / 255
-    x_train_dist = tf.expand_dims(x_train_dist, axis=3, name=None)
+    # x_train_dist, y_train_dist, x_test_dist, y_test_dist = pf.make_binary(x_train_dist, y_train_dist, x_test_dist, y_test_dist, selected_digits, 1, 0)
+    #
+    # x_train_dist = tf.pad(x_train_dist, [[0, 0], [2, 2], [2, 2]]) / 255
+    # x_train_dist = tf.expand_dims(x_train_dist, axis=3, name=None)
 
     x_test_dist = tf.pad(x_test_dist, [[0, 0], [2, 2], [2, 2]]) / 255
     x_test_dist = tf.expand_dims(x_test_dist, axis=3, name=None)
@@ -90,7 +92,7 @@ def run_digits(selected_digits, k):
            log_sj_martingale[0][-1], log_cj_martingale[-1], cum_loss_base, roc_auc_base, cum_loss_prot, roc_auc_prot
 
 #
-# selected_digits = [1, 8]
+# selected_digits = [1, 7]
 # res, test_loss, test_acc, test_dist_loss, test_dist_acc, p_pred, p_prime, y_test_dist, N_test, log_sj_martingale, \
 # log_cj_martingale, cum_loss_base, roc_auc_base, cum_loss_prot, roc_auc_prot = run_digits(selected_digits, k=2)
 
