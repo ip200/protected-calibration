@@ -91,18 +91,20 @@ def run_digits(selected_digits, k):
             y_test_dist], test_loss, test_acc, test_dist_loss, test_dist_acc, p_pred, p_prime, y_test_dist, n_test, \
            log_sj_martingale[0][-1], log_cj_martingale[-1], cum_loss_base, roc_auc_base, cum_loss_prot, roc_auc_prot
 
-#
-# selected_digits = [1, 7]
-# res, test_loss, test_acc, test_dist_loss, test_dist_acc, p_pred, p_prime, y_test_dist, N_test, log_sj_martingale, \
-# log_cj_martingale, cum_loss_base, roc_auc_base, cum_loss_prot, roc_auc_prot = run_digits(selected_digits, k=2)
+
+selected_digits = [1, 7]
+res, test_loss, test_acc, test_dist_loss, test_dist_acc, p_pred, p_prime, y_test_dist, N_test, log_sj_martingale, \
+log_cj_martingale, cum_loss_base, roc_auc_base, cum_loss_prot, roc_auc_prot = run_digits(selected_digits, k=2)
 
 
 results = pd.DataFrame()
 col_names = ['selected_digits', 'test_loss', 'test_acc', 'test_dist_loss', 'test_dist_acc', 'N_test', 'log_sj_martingale', 'log_cj_martingale', 'cum_loss_base', 'roc_auc_base', 'cum_loss_prot', 'roc_auc_prot']
 for i in range(9):
-  for j in range(i + 1, 10):
-    selected_digits = [i,j]
-    _, test_loss, test_acc, test_dist_loss, test_dist_acc, p_pred, p_prime, y_test_dist, N_test, log_sj_martingale, log_cj_martingale, cum_loss_base, roc_auc_base, cum_loss_prot, roc_auc_prot = run_digits(selected_digits, k=2)
-    opa = pd.DataFrame([[selected_digits, test_loss, test_acc, test_dist_loss, test_dist_acc, N_test, log_cj_martingale, log_cj_martingale, cum_loss_base, roc_auc_base, cum_loss_prot, roc_auc_prot]], columns=col_names)
-    results = results.append(opa)
-    results.to_csv('results_partitioned.csv')
+    for j in range(i + 1, 10):
+        selected_digits = [i,j]
+        _, test_loss, test_acc, test_dist_loss, test_dist_acc, p_pred, p_prime, y_test_dist, N_test, log_sj_martingale, log_cj_martingale, cum_loss_base, roc_auc_base, cum_loss_prot, roc_auc_prot = run_digits(selected_digits, k=2)
+        opa = pd.DataFrame([[selected_digits, test_loss, test_acc, test_dist_loss, test_dist_acc, N_test, log_cj_martingale, log_cj_martingale, cum_loss_base, roc_auc_base, cum_loss_prot, roc_auc_prot]], columns=col_names)
+        results = results.append(opa)
+        results.to_csv('results_partitioned.csv')
+
+

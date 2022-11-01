@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import metrics
+import itertools
 
 THETA = [[0, 1], [0, 0.5], [0, 2], [1, 1], [1, 0.5], [1, 2], [-1, 1], [-1, 0.5], [-1, 2]]
 J_RATES = [10 ** (-2), 10 ** (-3), 10 ** (-4)]  # the jumping rates; canonical: 0.01, 0.001, 0.0001
@@ -10,6 +11,13 @@ betas = [1, 0.5, 2]  # make sure to start from 1 (the neutral value)
 n_cal_alpha = len(alphas)
 n_cal_beta = len(betas) # the number of beta calibrators
 n_cal = n_cal_alpha * n_cal_beta
+
+alphas_multiclass = list(itertools.product([0, 1], repeat=10))
+betas_multiclass = [1, 0.5, 2]
+
+n_cal_alpha_multiclass = len(alphas)
+n_cal_beta_multiclass = len(betas)
+n_cal_multiclass = n_cal_alpha_multiclass * n_cal_beta_multiclass
 
 
 # the Brier loss function:
@@ -34,6 +42,12 @@ def cox(p, alpha, beta, k):
     p_mod[1] = p[1]**beta*np.exp(alpha)
     p_mod[0] = p[0]**beta
     return p_mod/np.sum(p_mod)
+
+
+def cox_multiclass(p, alpha, beta):
+    p_beta = p ** beta
+    p_mod = p_beta * np.exp(alpha)
+    return p_mod / np.sum(p_mod)
 
 
 def my_cal(p, cal_id, k):  # exactly as in OCM 32
@@ -196,3 +210,119 @@ def make_binary(x_train, y_train, x_test, y_test, labels, ratio, permute_ratio):
         np.random.shuffle(y_test[-int(len(y_test) / permute_ratio):])
 
     return x_train, y_train, x_test, y_test
+
+
+def set_alpha(a_index):
+    result = np.empty(3)  # initializing the result
+    current_index = a_index
+    for i in range(3):  # going over all digits
+        result[i] = current_index % 2
+        current_index = current_index // 2
+    return result.astype(int)
+
+
+def calc_martingale_multiclass(p_pred, y_test, n_test, k, plot_charts=False):
+    # Parameters
+    # pi = 0.5  # assumed but not used explicitly
+    n_jumpers = len(J_RATES)
+
+    # initializing the SJ and CJ test martingales on the log scale (including the initial value of 0):
+    log_sj_martingale = np.zeros((n_jumpers, (n_test + 1)))
+    log_cj_martingale = np.zeros(n_test + 1)
+
+    # Processing the dataset
+    for j_index in range(n_jumpers):  # going over all jumping rates
+        j_rate = J_RATES[j_index]  # the current jumping rate
+        mart_cap = np.zeros((n_cal_alpha_multiclass, n_cal_beta_multiclass))  # the normalized capital in each state (after normalization at the previous step)
+        mart_cap[0, 0] = 1  # the initial distribution for each jumping rate is concentrated at 0
+        for n in range(n_test):
+            # Jump mixing starts
+            capital = np.sum(mart_cap[:, :])  # redundant; Capital = 1
+            mart_cap[:, :] = (1 - j_rate) * mart_cap[:, :] + (j_rate / n_cal * capital)
+            # Jump mixing ends
+            for alpha_index in range(n_cal_alpha_multiclass):
+                alpha = list(alphas_multiclass[alpha_index])
+                for beta_index in range(n_cal_beta_multiclass):
+                    beta = betas_multiclass[beta_index]
+                    new_ppp = cox_multiclass(p_pred[n], alpha, beta)  # our new prediction
+                    mart_cap[alpha_index, beta_index] *= np.exp(-brier_loss(y_test[n], new_ppp, k)) / np.exp(-brier_loss(y_test[n], p_pred[n], k))
+            increase = np.sum(mart_cap[:, :])  # relative increase in my capital
+            log_sj_martingale[j_index, n + 1] = log_sj_martingale[j_index, n] + np.log10(increase)
+            mart_cap[:, :] /= increase
+
+    for n in range(n_test + 1):
+        log_cj_martingale[n] = log_mean([0, log_mean(log_sj_martingale[:, n])])  # 1 becomes 0 on the log scale
+
+    if plot_charts:
+        fig, ax = plt.subplots(figsize=(15, 5))
+        plt.plot(log_cj_martingale, c='b')  # for CJ martingale
+        plt.ylabel('log10 test martingale')  # choose singular or plural
+        plt.title("CJ martingale")
+        plt.show()
+
+        # Interesting values for the caption or text:
+        print("Final values of SJs on the log scale:", np.round(log_sj_martingale[:, n_test]))
+        print("Final value of CJ on the log scale:", np.round(log_cj_martingale[n_test]))
+
+    return log_sj_martingale, log_cj_martingale
+
+
+def calibrate_probs_multiclass(p_pred, y_test, n_test, k):
+    # Parameters
+    pi = 0.5  # default: 0.5
+    n_jumpers = len(J_RATES)
+
+    # initializing the predictive probability measures:
+    p_prime = np.empty((n_test, k))
+
+    # Processing the dataset
+    p_weight = pi  # amount set aside (passive weight)
+    a_weight = np.zeros((n_jumpers, n_cal_alpha_multiclass, n_cal_beta_multiclass)) # the weight of each active state
+    a_weight[:, 0, 0] = (1 - pi) / n_jumpers  # initial weights
+    for n in range(n_test):  # going through all test observations
+        # Jump mixing starts
+        for j_index in range(n_jumpers):
+            capital = np.sum(a_weight[j_index, :, :])  # active capital for this jumping rate
+            j_rate = J_RATES[j_index]
+            a_weight[j_index, :, :] = (1 - j_rate) * a_weight[j_index, :, :] + capital * j_rate / n_cal
+        # Jump mixing ends
+        g = np.empty(k)  # pseudoprediction initialized
+        for i in range(k):
+            g[i] = p_weight * np.exp(-brier_loss(i, p_pred[n], k))  # initializing the pseudoprediction to its passive component
+            for alpha_index in range(n_cal_alpha_multiclass):
+                alpha = list(alphas_multiclass[alpha_index])
+                for beta_index in range(n_cal_beta_multiclass):
+                    beta = betas_multiclass[beta_index]
+                    new_ppp = cox_multiclass(p_pred[n], alpha, beta)  # our new prediction # prediction calibrated by the k-th calibrator
+                    for j_index in range(n_jumpers):
+                        g[i] += a_weight[j_index, alpha_index, beta_index] * np.exp(-brier_loss(i, new_ppp, k))  # accumulating predictions calibrated by the calibrators
+            g[i] = -np.log(g[i])
+        # We need to solve equation for s, let's first try a shortcut:
+        s = (2 + np.sum(g)) / k
+        for i in range(k):
+            p_prime[n, i] = (s - g[i]) / 2  # my prediction
+        if s - np.max(g) < 0:
+            print("Wrong s for n =", n)
+        # Updating the weights:
+        p_weight *= np.exp(-brier_loss(y_test[n], p_pred[n], k))  # updating the passive capital
+        for alpha_index in range(n_cal_alpha_multiclass):
+            alpha = list(alphas_multiclass[alpha_index])
+            for beta_index in range(n_cal_beta_multiclass):
+                beta = betas_multiclass[beta_index]
+                new_ppp = cox_multiclass(p_pred[n], alpha, beta)  # our new prediction # prediction calibrated by the k-th calibrator
+                for j_index in range(n_jumpers):
+                    a_weight[j_index, alpha_index, beta_index] *= np.exp(-brier_loss(y_test[n], new_ppp, k))
+                    # Normalizing at each step (not needed):
+        capital = p_weight + np.sum(a_weight[:, :, :])  # the overall weight
+        p_weight /= capital  # normalization of the passive weight
+        a_weight[:, :, :] /= capital  # normalization of the active weights
+
+    p_prime[p_prime < 0] = 0
+    p_prime[p_prime > 1] = 1
+
+    return p_prime
+
+
+
+
+
